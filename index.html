@@ -1,0 +1,634 @@
+<!DOCTYPE html>
+<html lang="ka" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Recorder & Reverser Studio</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#eef2ff',
+                            500: '#6366f1',
+                            600: '#4f46e5',
+                            700: '#4338ca',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .dark .glass-card {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+        @keyframes pulse-ring {
+            0% { transform: scale(0.95); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 0.3; }
+            100% { transform: scale(0.95); opacity: 0.8; }
+        }
+        .recording-pulse {
+            animation: pulse-ring 2s infinite ease-in-out;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col justify-between transition-colors duration-300">
+
+    <!-- Header -->
+    <header class="w-full max-w-4xl mx-auto px-6 py-6 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+            <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-violet-500 flex items-center justify-center text-white shadow-lg shadow-indigo-500/30">
+                <i class="fa-solid fa-microphone-lines text-lg"></i>
+            </div>
+            <div>
+                <h1 class="font-bold text-lg tracking-tight">VoiceWave</h1>
+                <p class="text-xs text-slate-500 dark:text-slate-400">Record, Play & Reverse Audio</p>
+            </div>
+        </div>
+        <button id="themeToggle" class="p-2.5 rounded-xl glass-card hover:bg-slate-200 dark:hover:bg-slate-800 transition text-slate-600 dark:text-slate-300">
+            <i class="fa-solid fa-moon dark:hidden"></i>
+            <i class="fa-solid fa-sun hidden dark:inline"></i>
+        </button>
+    </header>
+
+    <!-- Main App Container -->
+    <main class="w-full max-w-2xl mx-auto px-4 py-4 flex-1 flex flex-col justify-center space-y-6">
+
+        <!-- Notification banner / custom alert -->
+        <div id="toast" class="hidden transform transition-all duration-300 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center space-x-2">
+            <i id="toastIcon" class="fa-solid"></i>
+            <span id="toastMsg"></span>
+        </div>
+
+        <!-- Section 1: Record your voice -->
+        <section class="glass-card rounded-2xl p-6 shadow-xl relative overflow-hidden">
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center space-x-2">
+                    <span class="w-7 h-7 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-500 flex items-center justify-center font-bold text-xs">1</span>
+                <h2 class="font-semibold text-base">Record your voice</h2>
+            </div>
+                <div id="timerDisplay" class="font-mono text-sm font-bold px-3 py-1 rounded-full bg-slate-200/60 dark:bg-slate-800/60 text-indigo-500">
+                    00:00
+                </div>
+            </div>
+
+            <!-- Waveform visualizer canvas container -->
+            <div class="w-full h-24 bg-slate-100 dark:bg-slate-900/80 rounded-xl overflow-hidden relative mb-6 border border-slate-200 dark:border-slate-800 flex items-center justify-center">
+                <canvas id="recordVisualizer" class="w-full h-full"></canvas>
+                <div id="recordPrompt" class="absolute text-xs text-slate-400 font-medium pointer-events-none">
+                    Click microphone to start recording
+                </div>
+            </div>
+
+            <!-- Record Controls -->
+            <div class="flex items-center justify-center space-x-4">
+                <button id="recordBtn" class="relative group p-5 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg shadow-indigo-500/30 transition transform active:scale-95 flex items-center justify-center">
+                    <span id="recordPulseBg" class="absolute inset-0 rounded-full bg-indigo-400 opacity-0"></span>
+                    <i id="recordIcon" class="fa-solid fa-microphone text-xl relative z-10"></i>
+                </button>
+                <button id="resetBtn" title="Clear / Reset" class="hidden p-3.5 rounded-full bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 transition transform active:scale-95">
+                    <i class="fa-solid fa-rotate-right"></i>
+                </button>
+            </div>
+        </section>
+
+        <!-- Section 2: Listen your recorded voice -->
+        <section id="sectionPlayback" class="glass-card rounded-2xl p-6 shadow-xl opacity-60 pointer-events-none transition-all duration-300">
+            <div class="flex items-center space-x-2 mb-4">
+                <span class="w-7 h-7 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-500 flex items-center justify-center font-bold text-xs">2</span>
+                <h2 class="font-semibold text-base">Listen your recorded voice</h2>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Progress & Waveform Bar -->
+                <div class="flex items-center space-x-3">
+                    <span id="currentTime" class="text-xs font-mono text-slate-400 w-10 text-right">00:00</span>
+                    <div id="playProgressBar" class="flex-1 h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden cursor-pointer relative">
+                        <div id="playProgressFill" class="absolute top-0 left-0 h-full bg-indigo-500 w-0 transition-all"></div>
+                    </div>
+                    <span id="totalTime" class="text-xs font-mono text-slate-400 w-10">00:00</span>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex items-center justify-between pt-2">
+                    <button id="playBtn" class="px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-indigo-600 hover:text-white dark:hover:bg-indigo-600 font-medium text-sm transition flex items-center space-x-2">
+                        <i id="playIcon" class="fa-solid fa-play"></i>
+                        <span id="playText">Play Recording</span>
+                    </button>
+                    <span class="text-xs text-slate-400">Standard Playback</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- Section 3: Listen your recorded voice reverse -->
+        <section id="sectionReverse" class="glass-card rounded-2xl p-6 shadow-xl opacity-60 pointer-events-none transition-all duration-300">
+            <div class="flex items-center space-x-2 mb-4">
+                <span class="w-7 h-7 rounded-lg bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-500 flex items-center justify-center font-bold text-xs">3</span>
+                <h2 class="font-semibold text-base">Listen your recorded voice reverse</h2>
+            </div>
+
+            <div class="space-y-4">
+                <!-- Progress & Waveform Bar -->
+                <div class="flex items-center space-x-3">
+                    <span id="reverseCurrentTime" class="text-xs font-mono text-slate-400 w-10 text-right">00:00</span>
+                    <div id="reverseProgressBar" class="flex-1 h-3 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden cursor-pointer relative">
+                        <div id="reverseProgressFill" class="absolute top-0 left-0 h-full bg-violet-500 w-0 transition-all"></div>
+                    </div>
+                    <span id="reverseTotalTime" class="text-xs font-mono text-slate-400 w-10">00:00</span>
+                </div>
+
+                <!-- Controls -->
+                <div class="flex items-center justify-between pt-2">
+                    <button id="reversePlayBtn" class="px-5 py-2.5 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-violet-600 hover:text-white dark:hover:bg-violet-600 font-medium text-sm transition flex items-center space-x-2">
+                        <i id="reversePlayIcon" class="fa-solid fa-backward"></i>
+                        <span id="reversePlayText">Play Reverse</span>
+                    </button>
+                    <span class="text-xs text-slate-400">Web Audio API Reverse Effect</span>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="w-full text-center py-4 text-xs text-slate-400">
+        VoiceWave &bull; Built with HTML5, Tailwind CSS, MediaRecorder & Web Audio API
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // DOM Elements
+        const themeToggle = document.getElementById('themeToggle');
+        const recordBtn = document.getElementById('recordBtn');
+        const recordIcon = document.getElementById('recordIcon');
+        const recordPulseBg = document.getElementById('recordPulseBg');
+        const resetBtn = document.getElementById('resetBtn');
+        const timerDisplay = document.getElementById('timerDisplay');
+        const recordPrompt = document.getElementById('recordPrompt');
+        const recordVisualizer = document.getElementById('recordVisualizer');
+        
+        const sectionPlayback = document.getElementById('sectionPlayback');
+        const playBtn = document.getElementById('playBtn');
+        const playIcon = document.getElementById('playIcon');
+        const playText = document.getElementById('playText');
+        const playProgressBar = document.getElementById('playProgressBar');
+        const playProgressFill = document.getElementById('playProgressFill');
+        const currentTimeEl = document.getElementById('currentTime');
+        const totalTimeEl = document.getElementById('totalTime');
+
+        const sectionReverse = document.getElementById('sectionReverse');
+        const reversePlayBtn = document.getElementById('reversePlayBtn');
+        const reversePlayIcon = document.getElementById('reversePlayIcon');
+        const reversePlayText = document.getElementById('reversePlayText');
+        const reverseProgressBar = document.getElementById('reverseProgressBar');
+        const reverseProgressFill = document.getElementById('reverseProgressFill');
+        const reverseCurrentTimeEl = document.getElementById('reverseCurrentTime');
+        const reverseTotalTimeEl = document.getElementById('reverseTotalTime');
+
+        const toast = document.getElementById('toast');
+        const toastMsg = document.getElementById('toastMsg');
+        const toastIcon = document.getElementById('toastIcon');
+
+        // State variables
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBlob = null;
+        let audioUrl = null;
+        let audioCtx = null;
+        let audioBuffer = null;
+        let reversedAudioBuffer = null;
+        
+        let isRecording = false;
+        let recordingTimer = null;
+        let secondsElapsed = 0;
+
+        let normalSourceNode = null;
+        let reverseSourceNode = null;
+        let isPlayingNormal = false;
+        let isPlayingReverse = false;
+        let playbackStartTime = 0;
+        let playbackTimer = null;
+
+        // Canvas Setup
+        const canvasCtx = recordVisualizer.getContext('2d');
+        function resizeCanvas() {
+            recordVisualizer.width = recordVisualizer.offsetWidth * window.devicePixelRatio;
+            recordVisualizer.height = recordVisualizer.offsetHeight * window.devicePixelRatio;
+            canvasCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // Draw idle or static waveform lines
+        function drawIdleWaveform() {
+            const width = recordVisualizer.width / window.devicePixelRatio;
+            const height = recordVisualizer.height / window.devicePixelRatio;
+            canvasCtx.clearRect(0, 0, width, height);
+            
+            canvasCtx.fillStyle = document.documentElement.classList.contains('dark') ? '#334155' : '#cbd5e1';
+            const barWidth = 3;
+            const gap = 4;
+            const bars = Math.floor(width / (barWidth + gap));
+            
+            for (let i = 0; i < bars; i++) {
+                const barHeight = Math.sin(i * 0.2) * 10 + 12;
+                canvasCtx.fillRect(i * (barWidth + gap), (height - barHeight) / 2, barWidth, barHeight);
+            }
+        }
+        drawIdleWaveform();
+
+        // Theme Toggle Logic
+        themeToggle.addEventListener('click', () => {
+            if (document.documentElement.classList.contains('dark')) {
+                document.documentElement.classList.remove('dark');
+                localStorage.theme = 'light';
+            } else {
+                document.documentElement.classList.add('dark');
+                localStorage.theme = 'dark';
+            }
+            drawIdleWaveform();
+        });
+
+        // Toast notification helper
+        function showToast(message, type = 'success') {
+            toast.className = `transform transition-all duration-300 px-4 py-3 rounded-xl text-sm font-medium shadow-lg flex items-center space-x-2 ${
+                type === 'success' ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'
+            }`;
+            toastIcon.className = type === 'success' ? 'fa-solid fa-circle-check' : 'fa-solid fa-circle-exclamation';
+            toastMsg.textContent = message;
+            toast.classList.remove('hidden');
+            setTimeout(() => {
+                toast.classList.add('hidden');
+            }, 3500);
+        }
+
+        // Format seconds to mm:ss
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Record Button Click Handler
+        recordBtn.addEventListener('click', async () => {
+            if (!isRecording) {
+                // Start Recording
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        if (event.data.size > 0) audioChunks.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+                        audioUrl = URL.createObjectURL(audioBlob);
+                        
+                        // Process with Web Audio API for reverse & playback info
+                        await processAudioBuffer(audioBlob);
+                        
+                        // Enable sections 2 and 3
+                        enablePlaybackSections();
+                        showToast('Recording completed successfully!');
+                    };
+
+                    mediaRecorder.start();
+                    isRecording = true;
+                    
+                    // UI changes
+                    recordBtn.classList.remove('bg-indigo-600', 'hover:bg-indigo-700');
+                    recordBtn.classList.add('bg-rose-600', 'hover:bg-rose-700');
+                    recordIcon.className = 'fa-solid fa-stop text-xl relative z-10';
+                    recordPulseBg.classList.add('recording-pulse', 'bg-rose-400');
+                    recordPrompt.textContent = 'Recording in progress... Click to stop';
+                    resetBtn.classList.remove('hidden');
+
+                    // Timer
+                    secondsElapsed = 0;
+                    timerDisplay.textContent = '00:00';
+                    recordingTimer = setInterval(() => {
+                        secondsElapsed++;
+                        timerDisplay.textContent = formatTime(secondsElapsed);
+                    }, 1000);
+
+                    // Visualize live audio using analyser
+                    setupLiveVisualizer(stream);
+
+                } catch (err) {
+                    console.error('Microphone access error:', err);
+                    showToast('Microphone access denied or not available.', 'error');
+                }
+            } else {
+                // Stop Recording
+                mediaRecorder.stop();
+                // Stop all tracks in stream
+                mediaRecorder.stream.getTracks().forEach(track => track.stop());
+                
+                isRecording = false;
+                clearInterval(recordingTimer);
+                
+                // Reset UI
+                recordBtn.classList.remove('bg-rose-600', 'hover:bg-rose-700');
+                recordBtn.classList.add('bg-indigo-600', 'hover:bg-indigo-700');
+                recordIcon.className = 'fa-solid fa-microphone text-xl relative z-10';
+                recordPulseBg.classList.remove('recording-pulse', 'bg-rose-400');
+                recordPrompt.textContent = 'Recording saved! Click to re-record';
+                
+                if (window.liveAnimId) cancelAnimationFrame(window.liveAnimId);
+                drawIdleWaveform();
+            }
+        });
+
+        // Live Audio Visualizer
+        function setupLiveVisualizer(stream) {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const source = ctx.createMediaStreamSource(stream);
+            const analyser = ctx.createAnalyser();
+            analyser.fftSize = 64;
+            source.connect(analyser);
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function drawLive() {
+                if (!isRecording) return;
+                window.liveAnimId = requestAnimationFrame(drawLive);
+                analyser.getByteFrequencyData(dataArray);
+
+                const width = recordVisualizer.width / window.devicePixelRatio;
+                const height = recordVisualizer.height / window.devicePixelRatio;
+                canvasCtx.clearRect(0, 0, width, height);
+
+                const barWidth = (width / bufferLength) * 1.5;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const barHeight = (dataArray[i] / 255) * height * 0.8;
+                    
+                    const gradient = canvasCtx.createLinearGradient(0, height, 0, 0);
+                    gradient.addColorStop(0, '#6366f1');
+                    gradient.addColorStop(1, '#a855f7');
+                    
+                    canvasCtx.fillStyle = gradient;
+                    canvasCtx.fillRect(x, height - barHeight, barWidth, barHeight);
+
+                    x += barWidth + 2;
+                }
+            }
+            drawLive();
+        }
+
+        // Process Audio Blob into Web Audio API AudioBuffer and create reversed buffer
+        async function processAudioBuffer(blob) {
+            if (!audioCtx) {
+                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            const arrayBuffer = await blob.arrayBuffer();
+            audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+
+            // Create Reversed Audio Buffer
+            const numberOfChannels = audioBuffer.numberOfChannels;
+            const sampleRate = audioBuffer.sampleRate;
+            const length = audioBuffer.length;
+
+            reversedAudioBuffer = audioCtx.createBuffer(numberOfChannels, length, sampleRate);
+
+            for (let channel = 0; channel < numberOfChannels; channel++) {
+                const originalData = audioBuffer.getChannelData(channel);
+                const reversedData = reversedAudioBuffer.getChannelData(channel);
+                for (let i = 0; i < length; i++) {
+                    reversedData[i] = originalData[length - 1 - i];
+                }
+            }
+
+            // Set duration labels
+            const durationStr = formatTime(audioBuffer.duration);
+            totalTimeEl.textContent = durationStr;
+            reverseTotalTimeEl.textContent = durationStr;
+        }
+
+        // Enable Playback Sections
+        function enablePlaybackSections() {
+            sectionPlayback.classList.remove('opacity-60', 'pointer-events-none');
+            sectionReverse.classList.remove('opacity-60', 'pointer-events-none');
+        }
+
+        // Reset Button Handler
+        resetBtn.addEventListener('click', () => {
+            stopAllPlaybacks();
+            audioBlob = null;
+            audioUrl = null;
+            audioBuffer = null;
+            reversedAudioBuffer = null;
+            
+            sectionPlayback.classList.add('opacity-60', 'pointer-events-none');
+            sectionReverse.classList.add('opacity-60', 'pointer-events-none');
+            
+            resetBtn.classList.add('hidden');
+            timerDisplay.textContent = '00:00';
+            recordPrompt.textContent = 'Click microphone to start recording';
+            playProgressFill.style.width = '0%';
+            reverseProgressFill.style.width = '0%';
+            currentTimeEl.textContent = '00:00';
+            reverseCurrentTimeEl.textContent = '00:00';
+            drawIdleWaveform();
+            showToast('Application reset. Ready for new recording.');
+        });
+
+        function stopAllPlaybacks() {
+            if (normalSourceNode) {
+                try { normalSourceNode.stop(); } catch(e) {}
+                normalSourceNode = null;
+            }
+            if (reverseSourceNode) {
+                try { reverseSourceNode.stop(); } catch(e) {}
+                reverseSourceNode = null;
+            }
+            isPlayingNormal = false;
+            isPlayingReverse = false;
+            clearInterval(playbackTimer);
+
+            playIcon.className = 'fa-solid fa-play';
+            playText.textContent = 'Play Recording';
+            reversePlayIcon.className = 'fa-solid fa-backward';
+            reversePlayText.textContent = 'Play Reverse';
+        }
+
+        // Section 2: Normal Playback Handler
+        playBtn.addEventListener('click', () => {
+            if (!audioBuffer) return;
+
+            if (isPlayingNormal) {
+                stopAllPlaybacks();
+                return;
+            }
+
+            stopAllPlaybacks();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            normalSourceNode = audioCtx.createBufferSource();
+            normalSourceNode.buffer = audioBuffer;
+            normalSourceNode.connect(audioCtx.destination);
+
+            playbackStartTime = audioCtx.currentTime;
+            const duration = audioBuffer.duration;
+
+            normalSourceNode.start(0);
+            isPlayingNormal = true;
+
+            playIcon.className = 'fa-solid fa-pause';
+            playText.textContent = 'Pause Recording';
+
+            // Progress tracking
+            playbackTimer = setInterval(() => {
+                const elapsed = audioCtx.currentTime - playbackStartTime;
+                if (elapsed >= duration) {
+                    stopAllPlaybacks();
+                    playProgressFill.style.width = '100%';
+                    currentTimeEl.textContent = formatTime(duration);
+                    setTimeout(() => {
+                        playProgressFill.style.width = '0%';
+                        currentTimeEl.textContent = '00:00';
+                    }, 500);
+                } else {
+                    const percent = (elapsed / duration) * 100;
+                    playProgressFill.style.width = `${percent}%`;
+                    currentTimeEl.textContent = formatTime(elapsed);
+                }
+            }, 50);
+
+            normalSourceNode.onended = () => {
+                if (isPlayingNormal) {
+                    stopAllPlaybacks();
+                    playProgressFill.style.width = '0%';
+                    currentTimeEl.textContent = '00:00';
+                }
+            };
+        });
+
+        // Section 3: Reverse Playback Handler
+        reversePlayBtn.addEventListener('click', () => {
+            if (!reversedAudioBuffer) return;
+
+            if (isPlayingReverse) {
+                stopAllPlaybacks();
+                return;
+            }
+
+            stopAllPlaybacks();
+            if (audioCtx.state === 'suspended') {
+                audioCtx.resume();
+            }
+
+            reverseSourceNode = audioCtx.createBufferSource();
+            reverseSourceNode.buffer = reversedAudioBuffer;
+            reverseSourceNode.connect(audioCtx.destination);
+
+            playbackStartTime = audioCtx.currentTime;
+            const duration = reversedAudioBuffer.duration;
+
+            reverseSourceNode.start(0);
+            isPlayingReverse = true;
+
+            reversePlayIcon.className = 'fa-solid fa-pause';
+            reversePlayText.textContent = 'Pause Reverse';
+
+            // Progress tracking
+            playbackTimer = setInterval(() => {
+                const elapsed = audioCtx.currentTime - playbackStartTime;
+                if (elapsed >= duration) {
+                    stopAllPlaybacks();
+                    reverseProgressFill.style.width = '100%';
+                    reverseCurrentTimeEl.textContent = formatTime(duration);
+                    setTimeout(() => {
+                        reverseProgressFill.style.width = '0%';
+                        reverseCurrentTimeEl.textContent = '00:00';
+                    }, 500);
+                } else {
+                    const percent = (elapsed / duration) * 100;
+                    reverseProgressFill.style.width = `${percent}%`;
+                    reverseCurrentTimeEl.textContent = formatTime(elapsed);
+                }
+            }, 50);
+
+            reverseSourceNode.onended = () => {
+                if (isPlayingReverse) {
+                    stopAllPlaybacks();
+                    reverseProgressFill.style.width = '0%';
+                    reverseCurrentTimeEl.textContent = '00:00';
+                }
+            };
+        });
+
+        // Clickable progress bar seeking for normal player
+        playProgressBar.addEventListener('click', (e) => {
+            if (!audioBuffer) return;
+            const rect = playProgressBar.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const width = rect.width;
+            const percentage = Math.max(0, Math.min(1, clickX / width));
+            
+            // Note: For simplicity with Web Audio buffer source, restarting from offset is supported
+            stopAllPlaybacks();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+
+            const offset = percentage * audioBuffer.duration;
+            normalSourceNode = audioCtx.createBufferSource();
+            normalSourceNode.buffer = audioBuffer;
+            normalSourceNode.connect(audioCtx.destination);
+
+            playbackStartTime = audioCtx.currentTime - offset;
+            const duration = audioBuffer.duration;
+
+            normalSourceNode.start(0, offset);
+            isPlayingNormal = true;
+
+            playIcon.className = 'fa-solid fa-pause';
+            playText.textContent = 'Pause Recording';
+
+            playbackTimer = setInterval(() => {
+                const elapsed = audioCtx.currentTime - playbackStartTime;
+                if (elapsed >= duration) {
+                    stopAllPlaybacks();
+                    playProgressFill.style.width = '100%';
+                    currentTimeEl.textContent = formatTime(duration);
+                } else {
+                    const percent = (elapsed / duration) * 100;
+                    playProgressFill.style.width = `${percent}%`;
+                    currentTimeEl.textContent = formatTime(elapsed);
+                }
+            }, 50);
+
+            normalSourceNode.onended = () => {
+                if (isPlayingNormal) {
+                    stopAllPlaybacks();
+                    playProgressFill.style.width = '0%';
+                    currentTimeEl.textContent = '00:00';
+                }
+            };
+        });
+
+    </script>
+</body>
+</html>
